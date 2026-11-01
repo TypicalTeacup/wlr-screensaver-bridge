@@ -1,8 +1,14 @@
 /*
  * wlr-screensaver-bridge
  *
- * Owns org.freedesktop.ScreenSaver on the session bus and translates
- * Inhibit/UnInhibit cookies into zwp_idle_inhibit_manager_v1 inhibitors.
+ * Modes:
+ *
+ *   (default) Owns org.freedesktop.ScreenSaver on the session bus and
+ *   translates Inhibit/UnInhibit cookies into zwp_idle_inhibit_manager_v1
+ *   inhibitors.
+ *
+ *   --hold    No D-Bus: create a single Wayland idle inhibitor and hold it
+ *   until killed. Manual "caffeine" for any wlroots compositor + swayidle.
  *
  * Why: Firefox (and other apps) suppress the screensaver via the XDG
  * portal's Inhibit interface, which xdg-desktop-portal-gtk forwards to the
@@ -33,6 +39,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <systemd/sd-bus.h>
 #include <systemd/sd-event.h>
 #include <wayland-client.h>
@@ -250,25 +257,48 @@ static int wayland_event(sd_event_source *source, int fd, uint32_t revents,
   return 0;
 }
 
-int main(void) {
-  setbuf(stderr, NULL);
-
+static int wayland_connect_and_require_inhibit(void) {
   display = wl_display_connect(NULL);
   if (!display) {
     fprintf(stderr, "cannot connect to wayland display\n");
-    return 1;
+    return -1;
   }
   struct wl_registry *registry = wl_display_get_registry(display);
   wl_registry_add_listener(registry, &registry_listener, NULL);
   if (wl_display_roundtrip(display) < 0) {
     fprintf(stderr, "wayland roundtrip failed\n");
-    return 1;
+    return -1;
   }
   if (!inhibit_manager) {
     fprintf(stderr,
             "compositor does not provide zwp_idle_inhibit_manager_v1\n");
-    return 1;
+    return -1;
   }
+  return 0;
+}
+
+/* --hold mode: one inhibitor, held until killed */
+static int run_hold(void) {
+  if (wayland_connect_and_require_inhibit() < 0)
+    return 1;
+  surface = wl_compositor_create_surface(compositor);
+  inhibitor =
+      zwp_idle_inhibit_manager_v1_create_inhibitor(inhibit_manager, surface);
+  wl_display_flush(display);
+  fprintf(stderr, "holding wayland idle inhibitor (pid %d); kill to release\n",
+          getpid());
+  for (;;)
+    pause();
+}
+
+int main(int argc, char **argv) {
+  setbuf(stderr, NULL);
+
+  if (argc > 1 && !strcmp(argv[1], "--hold"))
+    return run_hold();
+
+  if (wayland_connect_and_require_inhibit() < 0)
+    return 1;
 
   int r = sd_event_default(&event_loop);
   if (r < 0)

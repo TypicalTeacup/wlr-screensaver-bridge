@@ -76,6 +76,22 @@ systemctl --user enable --now wlr-screensaver-bridge
   manager's restart to re-acquire the name (sd-bus reconnects would silently
   drop it).
 
+## `--hold`: manual idle inhibition
+
+`wlr-screensaver-bridge --hold` skips D-Bus entirely: it creates one Wayland
+idle inhibitor on a headless surface and holds it until killed. Works on any
+`zwp_idle_inhibit_manager_v1` compositor with swayidle/wayidle.
+
+```sh
+# keep the screen awake until Ctrl-C
+wlr-screensaver-bridge --hold
+
+# or wrapped: inhibit only while a command runs
+wlr-screensaver-bridge --hold & holder=$!
+trap 'kill $holder' EXIT
+long_running_command
+```
+
 ## License
 
 MIT
