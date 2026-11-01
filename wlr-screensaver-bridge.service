@@ -1,0 +1,13 @@
+[Unit]
+Description=Bridge ScreenSaver D-Bus inhibits to Wayland idle-inhibit
+ConditionEnvironment=WAYLAND_DISPLAY
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=wlr-screensaver-bridge
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
