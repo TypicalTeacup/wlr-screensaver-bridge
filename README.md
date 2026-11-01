@@ -72,6 +72,9 @@ systemctl --user enable --now wlr-screensaver-bridge
 - Cookies are dropped automatically if the D-Bus owner disconnects without
   calling `UnInhibit` (common app-crash leak).
 - `Throttle`/`UnThrottle` are treated as `Inhibit`/`UnInhibit`.
+- On a session-bus disconnect the daemon exits and relies on the service
+  manager's restart to re-acquire the name (sd-bus reconnects would silently
+  drop it).
 
 ## License
 

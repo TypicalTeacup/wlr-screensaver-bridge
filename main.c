@@ -22,6 +22,10 @@
  * The compositor counts idle inhibitors even from surfaces that are not part
  * of the scene graph (a plain unmapped wl_surface), so a headless inhibitor
  * is enough — no window is ever shown.
+ *
+ * Robustness: sd-bus transparent reconnects never re-request a lost bus
+ * name, so auto-reconnect is disabled and a disconnect exits the daemon;
+ * the systemd unit's Restart=always then re-acquires name + vtable cleanly.
  */
 
 #include <stdbool.h>
@@ -272,6 +276,10 @@ int main(void) {
   r = sd_bus_default_user(&bus);
   if (r < 0)
     goto fail;
+  /* sd-bus reconnects would silently drop our bus name; exiting the event
+   * loop on disconnect lets the service manager restart us with a clean
+   * name + vtable. */
+  sd_bus_set_exit_on_disconnect(bus, 1);
 
   r = sd_bus_request_name(bus, "org.freedesktop.ScreenSaver", 0);
   if (r < 0)
